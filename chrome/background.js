@@ -136,95 +136,158 @@ function processTranslation(translation, replaceFlag) {
     if (existingDiv) {
       existingDiv.remove();
     }
-    // 在选中的文本下方显示一个悬浮 div
+    const existingOverlay = document.getElementById("llm_translate_overlay");
+    if (existingOverlay) {
+      existingOverlay.remove();
+    }
+
     const selection = window.getSelection();
     if (selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
+
+      // 1. 创建 Overlay (fixed position to cover viewport)
+      const overlay = document.createElement("div");
+      overlay.id = "llm_translate_overlay";
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0);
+        z-index: 2147483646;
+      `;
+
+      // 2. 创建弹出窗口 (absolute position to scroll with page)
       const div = document.createElement("div");
       div.id = "llm_translate_div";
-      div.textContent = translation;
+      div.style.cssText = `
+        position: absolute; /* Correct: Should scroll with the page */
+        background-color: #ffffff;
+        border: 1px solid #cccccc;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        box-sizing: border-box;
+        max-width: 400px;
+        min-width: 200px;
+        z-index: 2147483647;
+        font-family: sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #333333;
+        display: flex;
+        flex-direction: column;
+      `;
 
-      // 添加关闭按钮
-      const closeButton = document.createElement("button");
-      closeButton.innerHTML = `<svg width="16px" height="16px" viewBox="0 0 0.32 0.32" xmlns="http://www.w3.org/2000/svg"><path fill="#000000" fill-rule="evenodd" d="M0.226 0.066a0.02 0.02 0 1 1 0.028 0.028L0.188 0.16l0.066 0.066a0.02 0.02 0 0 1 -0.028 0.028L0.16 0.188l-0.066 0.066a0.02 0.02 0 0 1 -0.028 -0.028L0.132 0.16 0.066 0.094a0.02 0.02 0 0 1 0.028 -0.028L0.16 0.132z"/></svg>`;
-      closeButton.style.cssText = `
-          position: absolute;
-          top: 4px;
-          right: 4px;
-          cursor: pointer;
-          border: none;
-          font-size: 12px;
-          font-weight: bold;`;
+      // 设置初始位置 (Correct: Must include scroll offsets for absolute positioning)
+      div.style.top = rect.bottom + window.scrollY + "px";
+      div.style.left = rect.left + window.scrollX + "px";
 
-      // 添加拷贝按钮
+      // 3. 创建 Header
+      const header = document.createElement("div");
+      header.style.cssText = `
+        padding: 8px 10px;
+        cursor: move;
+        background-color: #f0f0f0;
+        border-bottom: 1px solid #cccccc;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        user-select: none;
+      `;
+
+      const title = document.createElement("span");
+      title.textContent = "翻译结果";
+      title.style.fontWeight = "bold";
+
+      const buttonsContainer = document.createElement("div");
+
+      // 4. 创建按钮
       const copyButton = document.createElement("button");
       copyButton.innerHTML = `<svg width="16px" height="16px" viewBox="0 0 0.32 0.32" xmlns="http://www.w3.org/2000/svg" fill="#000000"><path fill-rule="evenodd" clip-rule="evenodd" d="M0.08 0.08 0.1 0.06h0.108L0.28 0.132V0.28L0.26 0.3h-0.16L0.08 0.28zm0.18 0.06L0.2 0.08H0.1v0.2h0.16z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M0.06 0.02 0.04 0.04v0.2l0.02 0.02V0.04h0.128L0.168 0.02z"/></svg>`;
-      copyButton.style.cssText = `
-          position: absolute;
-          top: 4px;
-          right: 32px;
-          cursor: pointer;
-          border: none;
-          font-size: 12px;
-          font-weight: bold;`;
+      copyButton.style.cssText = `cursor: pointer; border: none; background-color: transparent;`;
 
-      copyButton.addEventListener("click", async () => {
+      const closeButton = document.createElement("button");
+      closeButton.innerHTML = `<svg width="16px" height="16px" viewBox="0 0 0.32 0.32" xmlns="http://www.w3.org/2000/svg"><path fill="#000000" fill-rule="evenodd" d="M0.226 0.066a0.02 0.02 0 1 1 0.028 0.028L0.188 0.16l0.066 0.066a0.02 0.02 0 0 1 -0.028 0.028L0.16 0.188l-0.066 0.066a0.02 0.02 0 0 1 -0.028 -0.028L0.132 0.16 0.066 0.094a0.02 0.02 0 0 1 0.028 -0.028L0.16 0.132z"/></svg>`;
+      closeButton.style.cssText = `cursor: pointer; border: none; background-color: transparent; margin-left: 8px;`;
+
+      buttonsContainer.appendChild(copyButton);
+      buttonsContainer.appendChild(closeButton);
+      header.appendChild(title);
+      header.appendChild(buttonsContainer);
+
+      // 5. 创建内容区域
+      const content = document.createElement("div");
+      content.textContent = translation;
+      content.style.cssText = `padding: 10px; white-space: pre-wrap;`;
+
+      div.appendChild(header);
+      div.appendChild(content);
+
+      document.body.appendChild(overlay);
+      document.body.appendChild(div);
+
+      // --- 事件处理 ---
+
+      const closePopup = () => {
+        div.remove();
+        overlay.remove();
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+
+      overlay.addEventListener('click', closePopup);
+      closeButton.addEventListener('click', closePopup);
+      
+      copyButton.addEventListener("click", async (e) => {
+        e.stopPropagation();
         try {
           await navigator.clipboard.writeText(translation);
-          copyButton.innerHTML = `<svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 16 16" style="enable-background:new 0 0 240.608 240.608;" xml:space="preserve" width="16" height="16"><path style="fill:#020202;" d="m13.884 1.993 2.116 2.116L6.102 14.007 0 7.905l2.116 -2.116 3.986 3.986z"/></svg>`;
-          setInterval(() => {
+          copyButton.innerHTML = `<svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 16 16" style="enable-background:new 0 0 240.608 240.608;" xml:space-preserve" width="16" height="16"><path style="fill:#020202;" d="m13.884 1.993 2.116 2.116L6.102 14.007 0 7.905l2.116 -2.116 3.986 3.986z"/></svg>`;
+          setTimeout(() => {
             copyButton.innerHTML = `<svg width="16px" height="16px" viewBox="0 0 0.32 0.32" xmlns="http://www.w3.org/2000/svg" fill="#000000"><path fill-rule="evenodd" clip-rule="evenodd" d="M0.08 0.08 0.1 0.06h0.108L0.28 0.132V0.28L0.26 0.3h-0.16L0.08 0.28zm0.18 0.06L0.2 0.08H0.1v0.2h0.16z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M0.06 0.02 0.04 0.04v0.2l0.02 0.02V0.04h0.128L0.168 0.02z"/></svg>`;
-          }, 3000);
+          }, 2000);
         } catch (err) {
           console.error("复制失败", err);
         }
       });
 
-      div.style.cssText = `
-          position: absolute;
-          background-color: #ffffff;
-          border: 1px solid #cccccc;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-          padding: 30px 10px 10px 10px;
-          box-sizing: border-box;
-          max-width: 400px;
-          min-width: 200px;
-          z-index: 2147483647;
-          font-family: sans-serif;
-          font-size: 14px;
-          line-height: 1.5;
-          color: #333333;
-          white-space: pre-wrap;
-      `;
+      // Correct Drag Logic for Absolute Positioning
+      let isDragging = false;
+      let startX, startY;
 
-      closeButton.style.backgroundColor = '#f0f0f0';
-      copyButton.style.backgroundColor = '#f0f0f0';
-
-      div.appendChild(closeButton);
-      div.appendChild(copyButton);
-
-      // 设置 div 的位置：位于选中区域下方
-      div.style.top = rect.bottom + window.scrollY + "px";
-      div.style.left = rect.left + window.scrollX + "px";
-
-      document.body.appendChild(div);
-
-      // Click outside to close
-      const handleClickOutside = (event) => {
-        if (!div.contains(event.target)) {
-          div.remove();
-          document.removeEventListener("mousedown", handleClickOutside);
-        }
+      const onMouseDown = (e) => {
+        isDragging = true;
+        // Use pageX/Y for document-relative coordinates
+        startX = e.pageX - div.offsetLeft;
+        startY = e.pageY - div.offsetTop;
+        header.style.cursor = 'grabbing';
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
       };
-      document.addEventListener("mousedown", handleClickOutside);
 
-      // Also update the close button to remove the listener
-      closeButton.addEventListener("click", () => {
-        div.remove();
-        document.removeEventListener("mousedown", handleClickOutside);
-      });
+      const onMouseMove = (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        // Use pageX/Y for smooth dragging
+        let newX = e.pageX - startX;
+        let newY = e.pageY - startY;
+        div.style.left = `${newX}px`;
+        div.style.top = `${newY}px`;
+      };
+
+      const onMouseUp = () => {
+        isDragging = false;
+        header.style.cursor = 'move';
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+
+      header.addEventListener('mousedown', onMouseDown);
     }
   }
 }
+
