@@ -156,9 +156,6 @@ function processTranslation(translation, replaceFlag) {
           border: none;
           font-size: 12px;
           font-weight: bold;`;
-      closeButton.addEventListener("click", () => {
-        div.remove();
-      });
 
       // 添加拷贝按钮
       const copyButton = document.createElement("button");
@@ -187,13 +184,23 @@ function processTranslation(translation, replaceFlag) {
       div.style.cssText = `
           position: absolute;
           background-color: #ffffff;
-          border: 1px solid #00000040;
-          padding: 25px 5px 5px 5px;
+          border: 1px solid #cccccc;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          padding: 30px 10px 10px 10px;
           box-sizing: border-box;
           max-width: 400px;
-          min-width: 64px;
-          z-index: 10000000001;
+          min-width: 200px;
+          z-index: 2147483647;
+          font-family: sans-serif;
+          font-size: 14px;
+          line-height: 1.5;
+          color: #333333;
+          white-space: pre-wrap;
       `;
+
+      closeButton.style.backgroundColor = '#f0f0f0';
+      copyButton.style.backgroundColor = '#f0f0f0';
 
       div.appendChild(closeButton);
       div.appendChild(copyButton);
@@ -203,6 +210,21 @@ function processTranslation(translation, replaceFlag) {
       div.style.left = rect.left + window.scrollX + "px";
 
       document.body.appendChild(div);
+
+      // Click outside to close
+      const handleClickOutside = (event) => {
+        if (!div.contains(event.target)) {
+          div.remove();
+          document.removeEventListener("mousedown", handleClickOutside);
+        }
+      };
+      document.addEventListener("mousedown", handleClickOutside);
+
+      // Also update the close button to remove the listener
+      closeButton.addEventListener("click", () => {
+        div.remove();
+        document.removeEventListener("mousedown", handleClickOutside);
+      });
     }
   }
 }

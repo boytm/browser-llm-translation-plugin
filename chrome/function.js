@@ -10,12 +10,12 @@ function getStorageData(keys) {
   });
 }
 
-// 生成具体提问的内容
-function getUserContent(target, data) {
+// 生成 system角色的内容
+function getSystemContent(target) {
   if (target == "editing_assistant")
-    return `请帮我把这个: '''${data}''', 修改成专业的官方文档和手册的中文或者英语的表达, 注意直接输出你的结果即可, 不需要任何其他的内容!`;
+    return "你是一个专业的编辑助手。请将以下文本修改得更加清晰、专业，适合用于官方文档。请直接输出修改后的文本，不要包含任何额外的评论或解释。";
   else
-    return `你是一个专业的中文和英语互相翻译的翻译助手, 请帮我把这个: '''${data}''', 翻译为另外一种语言, 注意直接输出你翻译的结果即可, 不需要任何其他的内容!`;
+    return "你是一个专业的翻译引擎。请翻译以下文本。如果是中文，请翻译成英文；如果是英文，请翻译成中文。请直接输出翻译结果，不要包含任何额外的评论或解释。";
 }
 
 // 调用大模型的接口
@@ -31,7 +31,7 @@ async function fetchLLM(data) {
     if (!endpoint || !apikey || !target) {
       return "关键参数没有设置完全";
     } else {
-      const contentText = getUserContent(target, data);
+      const systemContent = getSystemContent(target);
       const response = await fetch(`${endpoint}`, {
         headers: {
           accept: "application/json",
@@ -44,13 +44,12 @@ async function fetchLLM(data) {
           ...(modelName && { model: modelName }),
           messages: [
             {
+              role: "system",
+              content: systemContent,
+            },
+            {
               role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: contentText,
-                },
-              ],
+              content: data,
             },
           ],
         }),
