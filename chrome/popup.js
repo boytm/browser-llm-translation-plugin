@@ -92,8 +92,11 @@ document.addEventListener("DOMContentLoaded", function () {
     translateButton.textContent = "...";
     //将返回结果展示到页面上
     const data = translateTextarea.value;
-    const result = await fetchLLM(data);
-    resultSpan.textContent = result;
+    resultSpan.textContent =  ""; // 清空旧内容
+    // 使用流式接口
+    await fetchLLMStream(data, (chunk) => {
+      resultSpan.textContent += chunk;
+    });
     translateButton.textContent = "翻译";
   });
 });

@@ -71,3 +71,84 @@ async function fetchLLM(data) {
     return null;
   }
 }
+
+// 异步流式调用大模型接口（解析 JSON，提取 content 字段）
+async function fetchLLMStream(data, onMessage) {
+  try {
+    const {
+      endpoint = "",
+      apikey = "",
+      target = "",
+      modelName = "",
+    } = await getStorageData(["endpoint", "apikey", "target", "modelName"]);
+    if (!endpoint || !apikey || !target) {
+      throw new Error("关键参数没有设置完全");
+    }
+    const systemContent = getSystemContent(target);
+    const response = await fetch(`${endpoint}`, {
+      headers: {
+        accept: "application/json",
+        "api-key": `${apikey}`,
+        "content-type": "application/json",
+        authorization: `Bearer ${apikey}`,
+      },
+      referrerPolicy: "strict-origin-when-cross-origin",
+      body: JSON.stringify({
+        ...(modelName && { model: modelName }),
+        messages: [
+          { role: "system", content: systemContent },
+          { role: "user", content: data },
+        ],
+        stream: true, // 关键参数，要求接口支持流式
+      }),
+      method: "POST",
+      mode: "cors",
+      credentials: "omit",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let result = "";
+
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // 处理多行 data: ... 格式
+      const lines = buffer.split("\n");
+      buffer = lines.pop(); // 可能有半截，留到下次
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const dataStr = trimmed.slice(5).trim();
+        if (dataStr === "[DONE]") {
+          break;
+        }
+        try {
+          const json = JSON.parse(dataStr);
+          const content =
+            json.choices?.[0]?.delta?.content ?? "";
+          if (content) {
+            result += content;
+            if (onMessage) onMessage(content);
+          }
+        } catch (e) {
+          // 解析失败忽略
+        }
+      }
+    }
+
+    return result;
+  } catch (error) {
+    console.error("流式获取数据出错：", error);
+    return null;
+  }
+}
+//
