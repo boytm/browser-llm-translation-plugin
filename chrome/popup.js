@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const translateButton = document.getElementById("start-translate");
   const translateTextarea = document.getElementById("translate-textarea");
   const translateReplace = document.getElementById("replace-text-checkbox");
+  const streamModeCheckbox = document.getElementById("stream-mode-checkbox");
   const resultSpan = document.getElementById("res-span");
 
   // 检查是否所有关键元素都存在
@@ -18,6 +19,7 @@ document.addEventListener("DOMContentLoaded", function () {
     !translateButton ||
     !translateTextarea ||
     !translateReplace ||
+    !streamModeCheckbox ||
     !resultSpan
   ) {
     console.error("部分必要的 DOM 元素不存在，请检查 popup.html 文件的结构。");
@@ -27,7 +29,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // 从 chrome 存储中读取保存的数据，并填充到对应输入框
   chrome.storage.local.get(
-    ["endpoint", "apikey", "target", "modelName", "replaceText"],
+    ["endpoint", "apikey", "target", "modelName", "replaceText", "streamMode"],
     function (result) {
       if (result.endpoint) {
         endpointInput.value = result.endpoint;
@@ -43,6 +45,9 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       if (result.replaceText) {
         translateReplace.checked = result.replaceText;
+      }
+      if (result.streamMode !== undefined) {
+        streamModeCheckbox.checked = result.streamMode;
       }
     }
   );
@@ -87,16 +92,33 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 
+  // 流式传输模式有变化
+  streamModeCheckbox.addEventListener("change", function () {
+    const streamMode = streamModeCheckbox.checked;
+    chrome.storage.local.set({ streamMode: streamMode }, function () {
+      console.log("流式传输模式 更新成功: ", streamMode);
+    });
+  });
+
   // 点击翻译按钮时执行
   translateButton.addEventListener("click", async function () {
     translateButton.textContent = "...";
     //将返回结果展示到页面上
     const data = translateTextarea.value;
     resultSpan.textContent =  ""; // 清空旧内容
-    // 使用流式接口
-    await fetchLLMStream(data, (chunk) => {
-      resultSpan.textContent += chunk;
-    });
+    
+    // 根据流式传输勾选框的状态决定使用哪种方式
+    if (streamModeCheckbox.checked) {
+      // 使用流式接口
+      await fetchLLMStream(data, (chunk) => {
+        resultSpan.textContent += chunk;
+      });
+    } else {
+      // 使用非流式接口
+      const result = await fetchLLM(data);
+      resultSpan.textContent = result || "翻译失败";
+    }
+    
     translateButton.textContent = "翻译";
   });
 });

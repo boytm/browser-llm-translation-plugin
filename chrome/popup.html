@@ -105,6 +105,15 @@
         margin-left: 32px;
         accent-color: #007aff;
       }
+      /* 同一行中的多个勾选框 */
+      .row.checkbox-group {
+        display: flex;
+        gap: 20px;
+      }
+      .row.checkbox-group .checkbox-row {
+        flex: 1;
+        margin-bottom: 0;
+      }
       .actions {
         display: none;
       }
@@ -165,9 +174,15 @@
           <option value="editing_assistant">中英润色</option>
         </select>
       </div>
-      <div class="row checkbox-row">
-        <label for="replace-text-checkbox">替换文本</label>
-        <input id="replace-text-checkbox" type="checkbox" />
+      <div class="row checkbox-group">
+        <div class="row checkbox-row">
+          <label for="replace-text-checkbox">替换文本</label>
+          <input id="replace-text-checkbox" type="checkbox" />
+        </div>
+        <div class="row checkbox-row">
+          <label for="stream-mode-checkbox">流式传输</label>
+          <input id="stream-mode-checkbox" type="checkbox" checked />
+        </div>
       </div>
       <hr class="separator" />
       <div class="row textarea-button">
